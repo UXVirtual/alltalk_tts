@@ -578,12 +578,20 @@ async def generate_audio_internal(text, voice, language, temperature, repetition
             raise ValueError("Streaming is only supported in XTTSv2 local")
 
         print(f"[{params['branding']}TTSGen] Using API TTS")
-        model.tts_to_file(
-            text=text,
-            file_path=output_file,
-            speaker_wav=[f"{this_dir}/voices/{voice}"],
-            language=language,
-        )
+
+        if "tts_models/en/vctk/vits" in params['tts_model_name']:
+            model.tts_to_file(
+                text=text,
+                file_path=output_file,
+                speaker=voice
+            )
+        else:
+            model.tts_to_file(
+                text=text,
+                file_path=output_file,
+                speaker_wav=[f"{this_dir}/voices/{voice}"],
+                language=language,
+            )
 
     # Print Generation time and settings
     generate_end_time = time.time()  # Record the end time to generate TTS
