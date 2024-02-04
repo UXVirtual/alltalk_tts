@@ -477,16 +477,16 @@ async def deepspeed(request: Request, new_deepspeed_value: bool):
 ########################
 
 # TTS VOICE GENERATION METHODS (called from voice_preview and output_modifer)
-async def generate_audio(text, voice, language, temperature, repetition_penalty, output_file, streaming=False):
+async def generate_audio(text, voice, speaker, language, temperature, repetition_penalty, output_file, streaming=False):
     # Get the async generator from the internal function
-    response = generate_audio_internal(text, voice, language, temperature, repetition_penalty, output_file, streaming)
+    response = generate_audio_internal(text, voice, speaker, language, temperature, repetition_penalty, output_file, streaming)
     # If streaming, then return the generator as-is, otherwise just exhaust it and return
     if streaming:
         return response
     async for _ in response:
         pass
     
-async def generate_audio_internal(text, voice, language, temperature, repetition_penalty, output_file, streaming):
+async def generate_audio_internal(text, voice, speaker, language, temperature, repetition_penalty, output_file, streaming):
     global model
     if params["low_vram"] and device == "cpu":
         await switch_device()
@@ -583,7 +583,7 @@ async def generate_audio_internal(text, voice, language, temperature, repetition
             model.tts_to_file(
                 text=text,
                 file_path=output_file,
-                speaker=voice
+                speaker=speaker
             )
         else:
             model.tts_to_file(
@@ -613,13 +613,14 @@ async def generate(request: Request):
         data = await request.json()
         text = data["text"]
         voice = data["voice"]
+        speaker = data["speaker"]
         language = data["language"]
         temperature = data["temperature"]
         repetition_penalty = data["repetition_penalty"]
         output_file = data["output_file"]
         streaming = False
         # Generation logic
-        response = await generate_audio(text, voice, language, temperature, repetition_penalty, output_file, streaming)
+        response = await generate_audio(text, voice, speaker, language, temperature, repetition_penalty, output_file, streaming)
         if streaming:
             return StreamingResponse(response, media_type="audio/wav")
         return JSONResponse(
@@ -733,20 +734,20 @@ async def update_settings(
 ##################################
 
 @app.get("/tts-demo-request", response_class=StreamingResponse)
-async def tts_demo_request_streaming(text: str, voice: str, language: str, output_file: str):
+async def tts_demo_request_streaming(text: str, voice: str, speaker: str, language: str, output_file: str):
     try:
         output_file_path = this_dir / "outputs" / output_file
-        stream = await generate_audio(text, voice, language, temperature, repetition_penalty, output_file_path, streaming=True)
+        stream = await generate_audio(text, voice, speaker, language, temperature, repetition_penalty, output_file_path, streaming=True)
         return StreamingResponse(stream, media_type="audio/wav")
     except Exception as e:
         print(f"An error occurred: {e}")
         return JSONResponse(content={"error": "An error occurred"}, status_code=500)
 
 @app.post("/tts-demo-request", response_class=JSONResponse)
-async def tts_demo_request(request: Request, text: str = Form(...), voice: str = Form(...), language: str = Form(...), output_file: str = Form(...)):
+async def tts_demo_request(request: Request, text: str = Form(...), voice: str = Form(...), speaker: str = Form(...), language: str = Form(...), output_file: str = Form(...)):
     try:
         output_file_path = this_dir / "outputs" / output_file
-        await generate_audio(text, voice, language, temperature, repetition_penalty, output_file_path, streaming=False)
+        await generate_audio(text, voice, speaker, language, temperature, repetition_penalty, output_file_path, streaming=False)
         return JSONResponse(content={"output_file_path": str(output_file)}, status_code=200)
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -793,7 +794,7 @@ async def get_voices():
 #### PREVIEW VOICE API ####
 ###########################
 @app.post("/api/previewvoice/", response_class=JSONResponse)
-async def preview_voice(request: Request, voice: str = Form(...)):
+async def preview_voice(request: Request, voice: str = Form(...), character_speaker: str = Form("")):
     try:
         # Hardcoded settings
         language = "en"
@@ -808,7 +809,7 @@ async def preview_voice(request: Request, voice: str = Form(...)):
 
         # Generate the audio
         output_file_path = this_dir / "outputs" / f"{output_file_name}.wav"
-        await generate_audio(text, voice, language, temperature, repetition_penalty, output_file_path, streaming=False)
+        await generate_audio(text, voice, character_speaker, language, temperature, repetition_penalty, output_file_path, streaming=False)
 
         # Generate the URL
         output_file_url = f'http://{params["ip_address"]}:{params["port_number"]}/audio/{output_file_name}.wav'
@@ -842,20 +843,20 @@ import hashlib
 ##############################
 
 @app.get("/api/tts-generate-streaming", response_class=StreamingResponse)
-async def tts_generate_streaming(text: str, voice: str, language: str, output_file: str):
+async def tts_generate_streaming(text: str, voice: str, speaker: str, language: str, output_file: str):
     try:
         output_file_path = this_dir / "outputs" / output_file
-        stream = await generate_audio(text, voice, language, temperature, repetition_penalty, output_file_path, streaming=True)
+        stream = await generate_audio(text, voice, speaker, language, temperature, repetition_penalty, output_file_path, streaming=True)
         return StreamingResponse(stream, media_type="audio/wav")
     except Exception as e:
         print(f"An error occurred: {e}")
         return JSONResponse(content={"error": "An error occurred"}, status_code=500)
 
 @app.post("/api/tts-generate-streaming", response_class=JSONResponse)
-async def tts_generate_streaming(request: Request, text: str = Form(...), voice: str = Form(...), language: str = Form(...), output_file: str = Form(...)):
+async def tts_generate_streaming(request: Request, text: str = Form(...), voice: str = Form(...), speaker: str = Form(...), language: str = Form(...), output_file: str = Form(...)):
     try:
         output_file_path = this_dir / "outputs" / output_file
-        await generate_audio(text, voice, language, temperature, repetition_penalty, output_file_path, streaming=False)
+        await generate_audio(text, voice, speaker, language, temperature, repetition_penalty, output_file_path, streaming=False)
         return JSONResponse(content={"output_file_path": str(output_file)}, status_code=200)
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -894,6 +895,7 @@ class JSONInput(BaseModel):
     text_input: str = Field(..., max_length=1000, description="text_input needs to be 1000 characters or less.")
     text_filtering: str = Field(..., pattern="^(none|standard|html)$", description="text_filtering needs to be 'none', 'standard' or 'html'.")
     character_voice_gen: str = Field(..., description="character_voice_gen needs to be the name of a wav file e.g. mysample.wav.")
+    character_speaker: str = Field(..., description="character_speaker needs to be a valid string")
     narrator_enabled: bool = Field(..., description="narrator_enabled needs to be true or false.")
     narrator_voice_gen: str = Field(..., pattern="^.*\.wav$", description="narrator_voice_gen needs to be the name of a wav file e.g. mysample.wav.")
     text_not_inside: str = Field(..., pattern="^(character|narrator)$", description="text_not_inside needs to be 'character' or 'narrator'.")
@@ -1011,6 +1013,7 @@ async def tts_generate(
     text_input: str = Form(...),
     text_filtering: str = Form(...),
     character_voice_gen: str = Form(...),
+    character_speaker: str = Form(...),
     narrator_enabled: bool = Form(...),
     narrator_voice_gen: str = Form(...),
     text_not_inside: str = Form(...),
@@ -1026,6 +1029,7 @@ async def tts_generate(
             "text_input": text_input,
             "text_filtering": text_filtering,
             "character_voice_gen": character_voice_gen,
+            "character_speaker": character_speaker,
             "narrator_enabled": narrator_enabled,
             "narrator_voice_gen": narrator_voice_gen,
             "text_not_inside": text_not_inside,
@@ -1068,7 +1072,7 @@ async def tts_generate(
                 cleaned_part = re.sub(r'\n+', ' ', cleaned_part)
                 output_file = this_dir / "outputs" / f"{output_file_name}_{uuid.uuid4()}_{int(time.time())}.wav"
                 output_file_str = output_file.as_posix()
-                response = await generate_audio(cleaned_part, voice_to_use, language,temperature, repetition_penalty, output_file_str, streaming)
+                response = await generate_audio(cleaned_part, voice_to_use, character_speaker, language,temperature, repetition_penalty, output_file_str, streaming)
                 audio_path = output_file_str
                 audio_files_all_paragraphs.append(audio_path)
             # Combine audio files across paragraphs
@@ -1105,7 +1109,7 @@ async def tts_generate(
                 cleaned_string = re.sub(r'\n+', ' ', cleaned_string)
             else:
                 cleaned_string = text_input
-            response = await generate_audio(cleaned_string, character_voice_gen, language, temperature, repetition_penalty, output_file_path, streaming)
+            response = await generate_audio(cleaned_string, character_voice_gen, character_speaker, language, temperature, repetition_penalty, output_file_path, streaming)
         if sounddevice_installed == False or streaming == True:
             autoplay = False
         if autoplay:
