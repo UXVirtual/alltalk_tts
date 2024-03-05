@@ -179,6 +179,24 @@ Please read the note below about start-up times and also the note about ensuring
 
 Some extra voices for AllTalk are downloadable [here](https://drive.google.com/file/d/1bYdZdr3L69kmzUN3vSiqZmLRD7-A3M47/view?usp=drive_link) and [here](https://drive.google.com/file/d/1CPnx1rpkuKvVj5fGr9OiUJHZ_e8DfTzP/view)
 
+#### How to Setup SSL
+
+1. Follow steps 1-3 from [this guide to setup your certificate](https://medium.com/@mariovanrooij/adding-https-to-fastapi-ad5e0f9e084e). This installs the `fastapi`, `uvicorn[standard]` and `cryptography` packages and runs the following command in the alltalk directory to create a self-signed cert using openssl:
+
+```
+openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
+```
+
+2. If self-signing your cert and running AllTalk locally, you will also need to redirect the cert's common name (e.g. `alltalk`) to localhost in your PCs /etc/hosts file. You will need to do this for any other PC on your network that is connecting to this PC using the self-signed cert. On Windows open `C:\Windows\System32\drivers\etc\hosts` and add the following entry:
+
+```
+127.0.0.1 alltalk
+```
+
+3. Ensure alltalk is configured to bind to `0.0.0.0` (all addresses) if connecting over your local network or at the very least `127.0.0.1` if you are using the API on the same PC.
+
+The server is configured to use a cert.pem and cert.key file placed in the AllTalk directory. Follow these instructions to create one:
+
 #### 🟩 A note on Character Cards & Greeting Messages
 Messages intended for the Narrator should be enclosed in asterisks `*` and those for the character inside quotation marks `"`. However, AI systems often deviate from these rules, resulting in text that is neither in quotes nor asterisks. Sometimes, text may appear with only a single asterisk, and AI models may vary their formatting mid-conversation. For example, they might use asterisks initially and then switch to unmarked text. A properly formatted line should look like this:
 

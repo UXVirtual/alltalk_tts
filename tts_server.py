@@ -1181,4 +1181,4 @@ port_parameter = int(params["port_number"])
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host=host_parameter, port=port_parameter, log_level="warning")
+    uvicorn.run(app, host=host_parameter, port=port_parameter, log_level="warning", ssl_keyfile="./key.pem", ssl_certfile="./cert.pem")

@@ -6,3 +6,5 @@ config.json
 confignew.json
 models.json
 diagnostics.log
+key.pem
+cert.pem
